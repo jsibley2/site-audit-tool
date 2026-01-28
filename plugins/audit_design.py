@@ -89,15 +89,34 @@ class DesignAuditor:
         else:
             self.palette = self._load_palette(palette_name)
 
+        # Ensure we always have a valid palette structure
+        if self.palette is None:
+            self.palette = self._get_empty_palette()
+            self.palette_loaded = False
+        else:
+            self.palette_loaded = True
+
         # Pre-compute approved colors for fast lookup
         self.approved_colors = set()
-        if self.palette:
-            for hex_code in self.palette.get("BRAND_COLORS", {}).keys():
-                if hex_code != "transparent":
-                    self.approved_colors.add(hex_code.lower())
+        for hex_code in self.palette.get("BRAND_COLORS", {}).keys():
+            if hex_code != "transparent":
+                self.approved_colors.add(hex_code.lower())
 
         # Cache for external stylesheets
         self._stylesheet_cache = {}
+
+    def _get_empty_palette(self) -> Dict:
+        """Return an empty palette structure with sensible defaults."""
+        return {
+            "BRAND_COLORS": {},
+            "BRAND_GRADIENTS": {},
+            "APPROVED_TEXTURES": {},
+            "APPROVED_BLEND_MODES": [],
+            "TEXTURE_OPACITY_RANGE": (0.05, 0.20),
+            "SECTION_RULES": {},
+            "get_color_name": lambda x: "Unknown",
+            "get_section_rules": lambda x: None,
+        }
 
     def _extract_palette_from_module(self, palette_module) -> Optional[Dict]:
         """
@@ -409,7 +428,8 @@ class DesignAuditor:
                 clean_selector = re.sub(r'\[.*?\]', '', clean_selector)
                 if clean_selector.strip():
                     matching_elements = soup.select(clean_selector.strip())
-            except:
+            except (ValueError, SyntaxError, NotImplementedError) as e:
+                # Invalid CSS selectors are expected for some edge cases
                 pass
             
             # Extract colors from properties

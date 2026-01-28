@@ -29,6 +29,12 @@ from typing import Callable, List, Dict, Any, Set, Optional
 import requests
 from bs4 import BeautifulSoup
 
+# Import config with fallback
+try:
+    from config import USER_AGENT
+except ImportError:
+    USER_AGENT = "SiteAuditTool/1.0 (Web Design Audit)"
+
 
 class AuditEngine:
     """
@@ -84,25 +90,33 @@ class AuditEngine:
         # Session for connection pooling (more efficient than individual requests)
         self.session = requests.Session()
         self.session.headers.update({
-            "User-Agent": "UnifiedAuditTool/1.0 (Web Design Audit; Contact: jonathan@lastingchange.co)"
+            "User-Agent": USER_AGENT
         })
     
     def _normalize_url(self, url: str) -> str:
         """
         Normalize a URL to prevent duplicate crawling of the same page.
-        
+
         Normalization rules:
         - Remove trailing slashes (except for root)
         - Remove URL fragments (#section)
         - Remove common tracking parameters
         - Lowercase the domain
-        
+
         Args:
             url: The URL to normalize
-            
+
         Returns:
-            Normalized URL string
+            Normalized URL string, or empty string if invalid
         """
+        # Handle edge cases
+        if not url or not isinstance(url, str):
+            return ""
+
+        url = url.strip()
+        if not url:
+            return ""
+
         parsed = urlparse(url)
         
         # Lowercase the domain
@@ -148,19 +162,22 @@ class AuditEngine:
     def _is_valid_url(self, url: str) -> bool:
         """
         Check if a URL should be crawled.
-        
+
         Validation rules:
         - Must be HTTP or HTTPS
         - Must be on the allowed domain
         - Must not match any excluded patterns
         - Must not be a file download (PDF, image, etc.)
-        
+
         Args:
             url: The URL to validate
-            
+
         Returns:
             True if the URL should be crawled, False otherwise
         """
+        if not url or not isinstance(url, str):
+            return False
+
         try:
             parsed = urlparse(url)
             

@@ -191,4 +191,4 @@ STATUS_OUT_OF_RANGE = "❌ Out of range"
 
 # Identify the crawler politely
 # Include contact info so site owners can reach out if needed
-USER_AGENT = "UnifiedAuditTool/1.0 (Web Design Audit; https://github.com/your-repo)"
+USER_AGENT = "SiteAuditTool/1.0 (Web Design Audit; https://github.com/jsibley2/site-audit-tool)"
