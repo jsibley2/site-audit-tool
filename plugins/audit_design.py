@@ -73,25 +73,56 @@ class DesignAuditor:
     - source_context: Where the style originates
     """
     
-    def __init__(self, palette_name: str = "lasting_change"):
+    def __init__(self, palette_name: str = "lasting_change", palette_module=None):
         """
         Initialize the design auditor with a specific palette.
-        
+
         Args:
             palette_name: Name of the palette module to load from palettes/
+            palette_module: Optional pre-loaded palette module (takes precedence)
         """
         self.palette_name = palette_name
-        self.palette = self._load_palette(palette_name)
-        
+
+        # Use provided module or load by name
+        if palette_module is not None:
+            self.palette = self._extract_palette_from_module(palette_module)
+        else:
+            self.palette = self._load_palette(palette_name)
+
         # Pre-compute approved colors for fast lookup
         self.approved_colors = set()
         if self.palette:
             for hex_code in self.palette.get("BRAND_COLORS", {}).keys():
                 if hex_code != "transparent":
                     self.approved_colors.add(hex_code.lower())
-        
+
         # Cache for external stylesheets
         self._stylesheet_cache = {}
+
+    def _extract_palette_from_module(self, palette_module) -> Optional[Dict]:
+        """
+        Extract palette data from a pre-loaded module.
+
+        Args:
+            palette_module: A loaded Python module with palette attributes
+
+        Returns:
+            Dict with palette data or None
+        """
+        try:
+            return {
+                "BRAND_COLORS": getattr(palette_module, "BRAND_COLORS", {}),
+                "BRAND_GRADIENTS": getattr(palette_module, "BRAND_GRADIENTS", {}),
+                "APPROVED_TEXTURES": getattr(palette_module, "APPROVED_TEXTURES", {}),
+                "APPROVED_BLEND_MODES": getattr(palette_module, "APPROVED_BLEND_MODES", []),
+                "TEXTURE_OPACITY_RANGE": getattr(palette_module, "TEXTURE_OPACITY_RANGE", (0.05, 0.20)),
+                "SECTION_RULES": getattr(palette_module, "SECTION_RULES", {}),
+                "get_color_name": getattr(palette_module, "get_color_name", lambda x: "Unknown"),
+                "get_section_rules": getattr(palette_module, "get_section_rules", lambda x: None),
+            }
+        except Exception as e:
+            print(f"⚠️ Could not extract palette from module: {e}")
+            return None
     
     def _load_palette(self, palette_name: str) -> Optional[Dict]:
         """

@@ -582,10 +582,16 @@ Reports are saved to: <site_path>/reports/
     # Print generated file locations
     print("📁 Reports saved to:")
     if isinstance(generated_files, dict):
-        for file_type, filepath in generated_files.items():
-            print(f"   {file_type.upper()}: {filepath}")
+        output_dir = generated_files.get('output_dir', '')
+        all_files = generated_files.get('all_files', [])
+        if all_files:
+            for filepath in all_files:
+                print(f"   {os.path.basename(filepath)}")
+            print(f"\n   Directory: {output_dir}")
+        else:
+            print(f"   {generated_files.get('summary', 'No files generated')}")
     else:
-        # If generate_all_reports returns a single path
+        # Legacy: single path string
         print(f"   {generated_files}")
 
     print()

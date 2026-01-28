@@ -446,21 +446,32 @@ def generate_all_reports(results, url, site_path=None):
     """
     Generate all CSV reports for the audit results.
     This is the main entry point called by main.py.
-    
+
     Args:
-        results: Dict containing all audit results
+        results: List of audit result dicts OR dict with 'issues' key
         url: The audited site URL
         site_path: Path to site directory (e.g., ~/sites/lastingchange.co)
-    
+
     Returns:
-        Path to the summary report (main output file)
+        Dict mapping report type to file path
     """
     output_dir = get_site_report_dir(url, site_path)
-    
+
     print(f"Generating CSV reports in: {output_dir}")
-    
-    issues = results.get('issues', [])
-    audit_types = results.get('audit_types', [])
+
+    # Handle both list format (from engine) and dict format (legacy)
+    if isinstance(results, list):
+        issues = results
+        # Infer audit_types from the actual issue types present
+        type_mapping = {'color': 'colors', 'font': 'fonts', 'spacing': 'spacing',
+                        'image': 'images', 'seo': 'seo', 'content': 'content'}
+        found_types = set(i.get('type', '') for i in issues)
+        audit_types = [type_mapping.get(t, t) for t in found_types if t]
+        # Wrap in dict for sub-functions that expect it
+        results = {'issues': issues, 'audit_types': audit_types}
+    else:
+        issues = results.get('issues', [])
+        audit_types = results.get('audit_types', [])
     
     generated_files = []
     
@@ -504,5 +515,11 @@ def generate_all_reports(results, url, site_path=None):
     summary_path = generate_summary_report(results, url, output_dir)
     generated_files.append(summary_path)
     print(f"  ✓ Summary report: {os.path.basename(summary_path)}")
-    
-    return summary_path
+
+    # Return dict of all generated files
+    return {
+        'summary': summary_path,
+        'all_files': generated_files,
+        'output_dir': output_dir,
+        'issue_count': len(issues)
+    }
