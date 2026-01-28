@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Generated reports (keep directory structure)
+reports/**/*.csv
+reports/**/*.html
+!reports/.gitkeep
+
+# IDE
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Windows/WSL Zone.Identifier files
+*:Zone.Identifier
+
+# Local audit output files in root
+audit_*.csv
+audit_*.html

@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Audit: Single Site",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--site", "example.com"],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Audit: All Sites",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--all"],
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "Audit: Current File",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    }
+  ]
+}

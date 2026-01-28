@@ -1,0 +1,38 @@
+# ==============================================================================
+# UNIFIED AUDIT TOOL - Requirements
+# ==============================================================================
+# Install with: pip install -r requirements.txt
+# 
+# For development, create a virtual environment first:
+#   python -m venv venv
+#   source venv/bin/activate  (Linux/Mac)
+#   venv\Scripts\activate     (Windows)
+# ==============================================================================
+
+# Core Dependencies
+# -----------------
+requests>=2.31.0          # HTTP requests for fetching pages and stylesheets
+beautifulsoup4>=4.12.0    # HTML parsing and content extraction
+lxml>=4.9.0               # Fast XML/HTML parser (BeautifulSoup backend)
+
+# Optional: Enhanced CSS Parsing
+# ------------------------------
+# cssutils>=2.9.0         # Full CSS parsing (uncomment if needed)
+# tinycss2>=1.2.0         # Alternative CSS parser
+
+# Optional: Playwright for Computed Styles
+# ----------------------------------------
+# Uncomment these for more accurate style extraction
+# (requires additional setup: playwright install)
+# playwright>=1.40.0
+
+# Report Generation
+# -----------------
+# No additional dependencies - uses Python standard library (csv, datetime)
+
+# Development Dependencies (optional)
+# ------------------------------------
+# pytest>=7.4.0           # Testing framework
+# black>=23.0.0           # Code formatting
+# flake8>=6.1.0           # Linting
+# mypy>=1.7.0             # Type checking

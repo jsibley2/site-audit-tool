@@ -1,0 +1,14 @@
+{
+  "python.defaultInterpreterPath": "${env:HOME}/.asdf/shims/python",
+  "python.terminal.activateEnvironment": false,
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "ms-python.black-formatter"
+  },
+  "editor.rulers": [88],
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "*:Zone.Identifier": true
+  }
+}

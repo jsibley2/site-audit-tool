@@ -1,0 +1,41 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Audit Site by URL",
+      "type": "shell",
+      "command": "${env:HOME}/.asdf/shims/python",
+      "args": ["main.py", "--site", "${input:siteUrl}"],
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Audit Site by Path",
+      "type": "shell",
+      "command": "${env:HOME}/.asdf/shims/python",
+      "args": ["main.py", "--site", "${input:sitePath}"],
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "Audit All Sites",
+      "type": "shell",
+      "command": "${env:HOME}/.asdf/shims/python",
+      "args": ["main.py", "--all"],
+      "problemMatcher": [],
+      "group": "build"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "siteUrl",
+      "type": "promptString",
+      "description": "Enter the site URL to audit (e.g., example.com)"
+    },
+    {
+      "id": "sitePath",
+      "type": "promptString",
+      "description": "Enter the site config path (e.g., ~/sites/example.com)"
+    }
+  ]
+}
