@@ -300,6 +300,145 @@ def generate_image_report(results, output_dir):
     return filepath
 
 
+def generate_seo_report(results, output_dir):
+    """
+    Generate CSV report for SEO audit findings.
+
+    Args:
+        results: Dict containing SEO audit results
+        output_dir: Directory to save the report
+
+    Returns:
+        Path to the generated CSV file
+    """
+    filename = f"seo_audit_{generate_timestamp()}.csv"
+    filepath = os.path.join(output_dir, filename)
+
+    seo_issues = [i for i in results.get('issues', []) if i.get('type') == 'seo']
+
+    with open(filepath, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+
+        # Header
+        writer.writerow([
+            'Page URL',
+            'Element',
+            'Property',
+            'Expected',
+            'Found',
+            'Status'
+        ])
+
+        # Data rows
+        for issue in seo_issues:
+            writer.writerow([
+                issue.get('url', ''),
+                issue.get('element', ''),
+                issue.get('property', ''),
+                issue.get('expected', ''),
+                issue.get('found', ''),
+                issue.get('status', '')
+            ])
+
+    return filepath
+
+
+def generate_content_report(results, output_dir):
+    """
+    Generate CSV report for content audit findings.
+
+    Args:
+        results: Dict containing content audit results
+        output_dir: Directory to save the report
+
+    Returns:
+        Path to the generated CSV file
+    """
+    filename = f"content_audit_{generate_timestamp()}.csv"
+    filepath = os.path.join(output_dir, filename)
+
+    content_issues = [i for i in results.get('issues', []) if i.get('type') == 'content']
+
+    with open(filepath, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+
+        # Header
+        writer.writerow([
+            'Page URL',
+            'Element',
+            'Property',
+            'Expected',
+            'Found',
+            'Status',
+            'Context'
+        ])
+
+        # Data rows
+        for issue in content_issues:
+            writer.writerow([
+                issue.get('url', ''),
+                issue.get('element', ''),
+                issue.get('property', ''),
+                issue.get('expected', ''),
+                issue.get('found', ''),
+                issue.get('status', ''),
+                issue.get('context', '')
+            ])
+
+    return filepath
+
+
+def generate_design_report(results, output_dir):
+    """
+    Generate CSV report for all design audit findings (colors, textures, sections).
+
+    Args:
+        results: Dict containing design audit results
+        output_dir: Directory to save the report
+
+    Returns:
+        Path to the generated CSV file
+    """
+    filename = f"design_audit_{generate_timestamp()}.csv"
+    filepath = os.path.join(output_dir, filename)
+
+    # Include color, texture, and section types
+    design_issues = [i for i in results.get('issues', [])
+                     if i.get('type') in ('color', 'texture', 'section')]
+
+    with open(filepath, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+
+        # Header
+        writer.writerow([
+            'Page URL',
+            'Type',
+            'Element',
+            'Full Selector',
+            'Property',
+            'Expected',
+            'Found',
+            'Status',
+            'Source Context'
+        ])
+
+        # Data rows
+        for issue in design_issues:
+            writer.writerow([
+                issue.get('url', ''),
+                issue.get('type', ''),
+                issue.get('element', ''),
+                issue.get('full_selector', ''),
+                issue.get('property', ''),
+                issue.get('expected', ''),
+                issue.get('found', ''),
+                issue.get('status', ''),
+                issue.get('source_context', '')
+            ])
+
+    return filepath
+
+
 def generate_variable_candidates_report(results, output_dir):
     """
     Generate a dedicated CSV report for all variable candidates.
@@ -378,12 +517,13 @@ def generate_summary_report(results, url, output_dir):
     
     issues = results.get('issues', [])
     summary = results.get('summary', {})
-    
-    # Count by type
+
+    # Count by type - match actual types from plugins
     color_count = len([i for i in issues if i.get('type') == 'color'])
-    font_count = len([i for i in issues if i.get('type') == 'font'])
-    spacing_count = len([i for i in issues if i.get('type') == 'spacing'])
-    image_count = len([i for i in issues if i.get('type') == 'image'])
+    texture_count = len([i for i in issues if i.get('type') == 'texture'])
+    section_count = len([i for i in issues if i.get('type') == 'section'])
+    seo_count = len([i for i in issues if i.get('type') == 'seo'])
+    content_count = len([i for i in issues if i.get('type') == 'content'])
     
     # Count by severity
     high_count = len([i for i in issues if i.get('severity') == 'high'])
@@ -412,9 +552,10 @@ def generate_summary_report(results, url, output_dir):
         writer.writerow(['Issues by Type'])
         writer.writerow(['Type', 'Count'])
         writer.writerow(['Colors', color_count])
-        writer.writerow(['Fonts', font_count])
-        writer.writerow(['Spacing', spacing_count])
-        writer.writerow(['Images', image_count])
+        writer.writerow(['Textures', texture_count])
+        writer.writerow(['Sections', section_count])
+        writer.writerow(['SEO', seo_count])
+        writer.writerow(['Content', content_count])
         writer.writerow(['TOTAL', len(issues)])
         writer.writerow([])
         
@@ -435,6 +576,199 @@ def generate_summary_report(results, url, output_dir):
         writer.writerow(['Variable Candidates Found', variable_candidate_count])
         writer.writerow(['Percentage of Issues', f"{(variable_candidate_count / len(issues) * 100):.1f}%" if issues else "0%"])
     
+    return filepath
+
+
+# =============================================================================
+# HTML REPORT GENERATORS
+# =============================================================================
+
+def generate_html_report(results, url, output_dir):
+    """
+    Generate an HTML summary report with all audit findings.
+
+    Args:
+        results: Dict containing all audit results
+        url: The audited site URL
+        output_dir: Directory to save the report
+
+    Returns:
+        Path to the generated HTML file
+    """
+    filename = f"audit_report_{generate_timestamp()}.html"
+    filepath = os.path.join(output_dir, filename)
+
+    issues = results.get('issues', [])
+
+    # Count by type
+    color_count = len([i for i in issues if i.get('type') == 'color'])
+    texture_count = len([i for i in issues if i.get('type') == 'texture'])
+    section_count = len([i for i in issues if i.get('type') == 'section'])
+    seo_count = len([i for i in issues if i.get('type') == 'seo'])
+    content_count = len([i for i in issues if i.get('type') == 'content'])
+
+    # Count by status
+    pass_count = len([i for i in issues if 'Match' in str(i.get('status', '')) or 'range' in str(i.get('status', '')).lower()])
+    warn_count = len([i for i in issues if 'Near' in str(i.get('status', '')) or 'Review' in str(i.get('status', ''))])
+    fail_count = len([i for i in issues if 'Mismatch' in str(i.get('status', '')) or 'Missing' in str(i.get('status', '')) or 'Rogue' in str(i.get('status', ''))])
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audit Report - {url}</title>
+    <style>
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }}
+        header {{ background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }}
+        h1 {{ font-size: 1.5rem; margin-bottom: 5px; }}
+        .meta {{ opacity: 0.8; font-size: 0.9rem; }}
+        .summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }}
+        .stat-card {{ background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        .stat-value {{ font-size: 2rem; font-weight: bold; }}
+        .stat-label {{ font-size: 0.85rem; color: #666; }}
+        .pass {{ color: #27ae60; }}
+        .warn {{ color: #f39c12; }}
+        .fail {{ color: #e74c3c; }}
+        section {{ background: white; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden; }}
+        section h2 {{ background: #34495e; color: white; padding: 12px 20px; font-size: 1.1rem; }}
+        table {{ width: 100%; border-collapse: collapse; font-size: 0.9rem; }}
+        th, td {{ padding: 10px 15px; text-align: left; border-bottom: 1px solid #eee; }}
+        th {{ background: #ecf0f1; font-weight: 600; }}
+        tr:hover {{ background: #f8f9fa; }}
+        .status-pass {{ color: #27ae60; }}
+        .status-warn {{ color: #f39c12; }}
+        .status-fail {{ color: #e74c3c; }}
+        .truncate {{ max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+        footer {{ text-align: center; padding: 20px; color: #666; font-size: 0.85rem; }}
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Site Audit Report</h1>
+        <p class="meta">{url} | Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+    </header>
+
+    <div class="summary">
+        <div class="stat-card">
+            <div class="stat-value">{len(issues)}</div>
+            <div class="stat-label">Total Issues</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value pass">{pass_count}</div>
+            <div class="stat-label">Passed</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value warn">{warn_count}</div>
+            <div class="stat-label">Warnings</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value fail">{fail_count}</div>
+            <div class="stat-label">Failed</div>
+        </div>
+    </div>
+
+    <div class="summary">
+        <div class="stat-card"><div class="stat-value">{color_count}</div><div class="stat-label">Colors</div></div>
+        <div class="stat-card"><div class="stat-value">{texture_count}</div><div class="stat-label">Textures</div></div>
+        <div class="stat-card"><div class="stat-value">{section_count}</div><div class="stat-label">Sections</div></div>
+        <div class="stat-card"><div class="stat-value">{seo_count}</div><div class="stat-label">SEO</div></div>
+        <div class="stat-card"><div class="stat-value">{content_count}</div><div class="stat-label">Content</div></div>
+    </div>
+"""
+
+    def get_status_class(status):
+        status_str = str(status)
+        if 'Match' in status_str or 'range' in status_str.lower():
+            return 'status-pass'
+        elif 'Near' in status_str or 'Review' in status_str or 'Thin' in status_str:
+            return 'status-warn'
+        return 'status-fail'
+
+    def escape_html(text):
+        if text is None:
+            return ''
+        return str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+    # Design issues section
+    design_issues = [i for i in issues if i.get('type') in ('color', 'texture', 'section')]
+    if design_issues:
+        html_content += """
+    <section>
+        <h2>Design Audit ({} issues)</h2>
+        <table>
+            <tr><th>Type</th><th>Element</th><th>Property</th><th>Expected</th><th>Found</th><th>Status</th></tr>
+""".format(len(design_issues))
+        for issue in design_issues[:100]:  # Limit to 100 for performance
+            html_content += f"""            <tr>
+                <td>{escape_html(issue.get('type', ''))}</td>
+                <td class="truncate">{escape_html(issue.get('element', ''))}</td>
+                <td>{escape_html(issue.get('property', ''))}</td>
+                <td class="truncate">{escape_html(issue.get('expected', ''))}</td>
+                <td>{escape_html(issue.get('found', ''))}</td>
+                <td class="{get_status_class(issue.get('status'))}">{escape_html(issue.get('status', ''))}</td>
+            </tr>
+"""
+        if len(design_issues) > 100:
+            html_content += f'            <tr><td colspan="6">... and {len(design_issues) - 100} more issues (see CSV for full list)</td></tr>\n'
+        html_content += "        </table>\n    </section>\n"
+
+    # SEO issues section
+    seo_issues = [i for i in issues if i.get('type') == 'seo']
+    if seo_issues:
+        html_content += """
+    <section>
+        <h2>SEO Audit ({} issues)</h2>
+        <table>
+            <tr><th>Element</th><th>Property</th><th>Expected</th><th>Found</th><th>Status</th></tr>
+""".format(len(seo_issues))
+        for issue in seo_issues[:100]:
+            html_content += f"""            <tr>
+                <td>{escape_html(issue.get('element', ''))}</td>
+                <td>{escape_html(issue.get('property', ''))}</td>
+                <td class="truncate">{escape_html(issue.get('expected', ''))}</td>
+                <td class="truncate">{escape_html(issue.get('found', ''))}</td>
+                <td class="{get_status_class(issue.get('status'))}">{escape_html(issue.get('status', ''))}</td>
+            </tr>
+"""
+        if len(seo_issues) > 100:
+            html_content += f'            <tr><td colspan="5">... and {len(seo_issues) - 100} more issues</td></tr>\n'
+        html_content += "        </table>\n    </section>\n"
+
+    # Content issues section
+    content_issues = [i for i in issues if i.get('type') == 'content']
+    if content_issues:
+        html_content += """
+    <section>
+        <h2>Content Audit ({} issues)</h2>
+        <table>
+            <tr><th>Element</th><th>Property</th><th>Expected</th><th>Found</th><th>Status</th></tr>
+""".format(len(content_issues))
+        for issue in content_issues[:100]:
+            html_content += f"""            <tr>
+                <td>{escape_html(issue.get('element', ''))}</td>
+                <td>{escape_html(issue.get('property', ''))}</td>
+                <td class="truncate">{escape_html(issue.get('expected', ''))}</td>
+                <td class="truncate">{escape_html(issue.get('found', ''))}</td>
+                <td class="{get_status_class(issue.get('status'))}">{escape_html(issue.get('status', ''))}</td>
+            </tr>
+"""
+        if len(content_issues) > 100:
+            html_content += f'            <tr><td colspan="5">... and {len(content_issues) - 100} more issues</td></tr>\n'
+        html_content += "        </table>\n    </section>\n"
+
+    html_content += """
+    <footer>
+        Generated by Site Audit Tool
+    </footer>
+</body>
+</html>
+"""
+
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(html_content)
+
     return filepath
 
 
@@ -462,48 +796,36 @@ def generate_all_reports(results, url, site_path=None):
     # Handle both list format (from engine) and dict format (legacy)
     if isinstance(results, list):
         issues = results
-        # Infer audit_types from the actual issue types present
-        type_mapping = {'color': 'colors', 'font': 'fonts', 'spacing': 'spacing',
-                        'image': 'images', 'seo': 'seo', 'content': 'content'}
-        found_types = set(i.get('type', '') for i in issues)
-        audit_types = [type_mapping.get(t, t) for t in found_types if t]
         # Wrap in dict for sub-functions that expect it
-        results = {'issues': issues, 'audit_types': audit_types}
+        results = {'issues': issues}
     else:
         issues = results.get('issues', [])
-        audit_types = results.get('audit_types', [])
-    
+
     generated_files = []
-    
-    # Generate type-specific reports only if there are issues of that type
-    if 'colors' in audit_types:
-        color_issues = [i for i in issues if i.get('type') == 'color']
-        if color_issues:
-            path = generate_color_report(results, output_dir)
-            generated_files.append(path)
-            print(f"  ✓ Color report: {os.path.basename(path)} ({len(color_issues)} issues)")
-    
-    if 'fonts' in audit_types:
-        font_issues = [i for i in issues if i.get('type') == 'font']
-        if font_issues:
-            path = generate_font_report(results, output_dir)
-            generated_files.append(path)
-            print(f"  ✓ Font report: {os.path.basename(path)} ({len(font_issues)} issues)")
-    
-    if 'spacing' in audit_types:
-        spacing_issues = [i for i in issues if i.get('type') == 'spacing']
-        if spacing_issues:
-            path = generate_spacing_report(results, output_dir)
-            generated_files.append(path)
-            print(f"  ✓ Spacing report: {os.path.basename(path)} ({len(spacing_issues)} issues)")
-    
-    if 'images' in audit_types:
-        image_issues = [i for i in issues if i.get('type') == 'image']
-        if image_issues:
-            path = generate_image_report(results, output_dir)
-            generated_files.append(path)
-            print(f"  ✓ Image report: {os.path.basename(path)} ({len(image_issues)} issues)")
-    
+
+    # Count issues by actual type
+    design_issues = [i for i in issues if i.get('type') in ('color', 'texture', 'section')]
+    seo_issues = [i for i in issues if i.get('type') == 'seo']
+    content_issues = [i for i in issues if i.get('type') == 'content']
+
+    # Generate Design report (colors, textures, sections)
+    if design_issues:
+        path = generate_design_report(results, output_dir)
+        generated_files.append(path)
+        print(f"  ✓ Design report: {os.path.basename(path)} ({len(design_issues)} issues)")
+
+    # Generate SEO report
+    if seo_issues:
+        path = generate_seo_report(results, output_dir)
+        generated_files.append(path)
+        print(f"  ✓ SEO report: {os.path.basename(path)} ({len(seo_issues)} issues)")
+
+    # Generate Content report
+    if content_issues:
+        path = generate_content_report(results, output_dir)
+        generated_files.append(path)
+        print(f"  ✓ Content report: {os.path.basename(path)} ({len(content_issues)} issues)")
+
     # Generate variable candidates report (Design System Linter output)
     variable_candidates = [i for i in issues if i.get('variable_candidate')]
     if variable_candidates:
@@ -511,14 +833,20 @@ def generate_all_reports(results, url, site_path=None):
         generated_files.append(path)
         print(f"  ✓ Variable candidates: {os.path.basename(path)} ({len(variable_candidates)} candidates)")
     
-    # Always generate summary
+    # Always generate summary CSV
     summary_path = generate_summary_report(results, url, output_dir)
     generated_files.append(summary_path)
     print(f"  ✓ Summary report: {os.path.basename(summary_path)}")
 
+    # Always generate HTML report
+    html_path = generate_html_report(results, url, output_dir)
+    generated_files.append(html_path)
+    print(f"  ✓ HTML report: {os.path.basename(html_path)}")
+
     # Return dict of all generated files
     return {
         'summary': summary_path,
+        'html': html_path,
         'all_files': generated_files,
         'output_dir': output_dir,
         'issue_count': len(issues)

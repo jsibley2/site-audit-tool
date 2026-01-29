@@ -2,26 +2,36 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Audit Site by URL",
+      "label": "Audit Site (Auto Path)",
+      "detail": "Uses ~/sites/{domain} as config path",
       "type": "shell",
-      "command": "${env:HOME}/.asdf/shims/python",
-      "args": ["main.py", "--site", "${input:siteUrl}"],
+      "command": "URL='${input:siteUrl}' && DOMAIN=$(echo \"$URL\" | sed 's|https://||;s|http://||;s|/.*||') && ${workspaceFolder}/.venv/bin/python main.py \"$URL\" --site ~/sites/\"$DOMAIN\" --all",
       "problemMatcher": [],
       "group": "build"
     },
     {
-      "label": "Audit Site by Path",
+      "label": "Audit Site (Custom Path)",
+      "detail": "Specify both URL and config path",
       "type": "shell",
-      "command": "${env:HOME}/.asdf/shims/python",
-      "args": ["main.py", "--site", "${input:sitePath}"],
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "main.py",
+        "${input:siteUrl}",
+        "--site", "${input:sitePath}",
+        "--all"
+      ],
       "problemMatcher": [],
       "group": "build"
     },
     {
-      "label": "Audit All Sites",
+      "label": "List Reports",
       "type": "shell",
-      "command": "${env:HOME}/.asdf/shims/python",
-      "args": ["main.py", "--all"],
+      "command": "${workspaceFolder}/.venv/bin/python",
+      "args": [
+        "main.py",
+        "--site", "${input:sitePath}",
+        "--list-reports"
+      ],
       "problemMatcher": [],
       "group": "build"
     }
@@ -30,12 +40,12 @@
     {
       "id": "siteUrl",
       "type": "promptString",
-      "description": "Enter the site URL to audit (e.g., example.com)"
+      "description": "Site URL (e.g., https://lastingchange.co)"
     },
     {
       "id": "sitePath",
       "type": "promptString",
-      "description": "Enter the site config path (e.g., ~/sites/example.com)"
+      "description": "Site config path (e.g., ~/sites/lastingchange.co)"
     }
   ]
 }

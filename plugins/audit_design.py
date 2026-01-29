@@ -406,20 +406,27 @@ class DesignAuditor:
     # CSS PARSING
     # ==========================================================================
     
-    def _parse_css_for_colors(self, css: str, soup: BeautifulSoup, 
+    def _parse_css_for_colors(self, css: str, soup: BeautifulSoup,
                                source: str, url: str) -> List[Dict[str, Any]]:
         """
         Parse CSS content and extract all color values with context.
         """
         results = []
-        
+
+        # Strip CSS comments before parsing
+        css = re.sub(r'/\*.*?\*/', '', css, flags=re.DOTALL)
+
         # Regex to match CSS rules: selector { properties }
         rule_pattern = r'([^{]+)\{([^}]+)\}'
-        
+
         for match in re.finditer(rule_pattern, css):
             selector = match.group(1).strip()
             properties = match.group(2)
-            
+
+            # Skip empty selectors or @rules (media queries, keyframes, etc.)
+            if not selector or selector.startswith('@'):
+                continue
+
             # Try to find matching elements in the DOM for context
             matching_elements = []
             try:
@@ -428,7 +435,7 @@ class DesignAuditor:
                 clean_selector = re.sub(r'\[.*?\]', '', clean_selector)
                 if clean_selector.strip():
                     matching_elements = soup.select(clean_selector.strip())
-            except (ValueError, SyntaxError, NotImplementedError) as e:
+            except Exception:
                 # Invalid CSS selectors are expected for some edge cases
                 pass
             
