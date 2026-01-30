@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CSV Export Module - Site-based Architecture with Design System Linter Support
-Generates CSV reports and saves them to the site's reports directory
+Generates CSV and HTML reports and saves them to the site's reports directory
 
 Location: ~/scripts/audit_tool/reports/csv_export.py
 
@@ -9,6 +9,13 @@ Required imports by main.py:
 - generate_all_reports
 - get_site_report_dir
 - get_reports_base_dir
+
+Features:
+- Variable Candidate column for hard-coded values that should be variables
+- Source Context column identifying where styles are defined (hiding spots)
+- Dedicated variable remediation report
+- Enhanced summary with linter coverage metrics
+- HTML report with filterable tables and visual styling
 """
 
 import csv
@@ -21,43 +28,46 @@ from urllib.parse import urlparse
 # DIRECTORY FUNCTIONS (Required by main.py)
 # =============================================================================
 
-def get_reports_base_dir(base_url, site_path=None):
+def get_reports_base_dir(base_url=None, site_path=None):
     """
     Determines the base directory for reports.
     Matches the import expected by main.py.
-    
+
     Args:
-        base_url: The site URL being audited
+        base_url: The site URL being audited (optional)
         site_path: Optional path to site directory (e.g., ~/sites/lastingchange.co)
-    
+
     Returns:
         Path to the reports directory
     """
     if site_path:
         return os.path.join(site_path, 'reports')
-    
-    # Fallback to domain-based folder
-    domain = urlparse(base_url).netloc.replace('www.', '')
-    return os.path.join('reports', domain)
+
+    if base_url:
+        # Fallback to domain-based folder
+        domain = urlparse(base_url).netloc.replace('www.', '')
+        return os.path.join('reports', domain)
+
+    return 'reports'
 
 
-def get_site_report_dir(base_url, site_path=None):
+def get_site_report_dir(base_url=None, site_path=None):
     """
     Gets the site report directory and ensures it exists.
     Matches the import expected by main.py.
-    
+
     Args:
-        base_url: The site URL being audited
+        base_url: The site URL being audited (optional)
         site_path: Optional path to site directory
-    
+
     Returns:
         Path to the reports directory (created if it doesn't exist)
     """
     report_dir = get_reports_base_dir(base_url, site_path)
-    
+
     if not os.path.exists(report_dir):
         os.makedirs(report_dir)
-        
+
     return report_dir
 
 
@@ -68,13 +78,15 @@ def get_site_report_dir(base_url, site_path=None):
 def sanitize_filename(url):
     """
     Convert a URL to a safe filename component.
-    
+
     Args:
         url: The site URL
-    
+
     Returns:
         Sanitized string suitable for filenames
     """
+    if not url:
+        return "unknown"
     domain = url.replace('https://', '').replace('http://', '').replace('www.', '')
     domain = domain.split('/')[0]
     return domain.replace('.', '_')
@@ -85,296 +97,65 @@ def generate_timestamp():
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+def escape_html(text):
+    """Escape HTML special characters."""
+    if text is None:
+        return ''
+    return str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+
+
+def truncate(text, max_length=50):
+    """Truncate text with ellipsis."""
+    if not text:
+        return ''
+    text = str(text)
+    if len(text) > max_length:
+        return text[:max_length - 3] + '...'
+    return text
+
+
 # =============================================================================
-# REPORT GENERATORS
+# CSV REPORT GENERATORS
 # =============================================================================
 
-def generate_color_report(results, output_dir):
-    """
-    Generate CSV report for color audit findings.
-    Includes Variable Candidate and Source Context columns.
-    
-    Args:
-        results: Dict containing color audit results
-        output_dir: Directory to save the report
-    
-    Returns:
-        Path to the generated CSV file
-    """
+def generate_color_report(issues, output_dir):
+    """Generate CSV report for color audit findings."""
     filename = f"color_audit_{generate_timestamp()}.csv"
     filepath = os.path.join(output_dir, filename)
-    
-    color_issues = [i for i in results.get('issues', []) if i.get('type') == 'color']
-    
-    with open(filepath, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        
-        # Header with new columns
-        writer.writerow([
-            'Page URL',
-            'Element',
-            'CSS Selector',
-            'Property',
-            'Found Value',
-            'Variable Candidate',
-            'Match Type',
-            'Source Context',
-            'Severity',
-            'Notes'
-        ])
-        
-        # Data rows
-        for issue in color_issues:
-            writer.writerow([
-                issue.get('page_url', ''),
-                issue.get('element', ''),
-                issue.get('selector', ''),
-                issue.get('property', ''),
-                issue.get('found_value', ''),
-                issue.get('variable_candidate', ''),
-                issue.get('match_type', ''),
-                issue.get('source_context', ''),
-                issue.get('severity', 'medium'),
-                issue.get('notes', '')
-            ])
-    
-    return filepath
-
-
-def generate_font_report(results, output_dir):
-    """
-    Generate CSV report for font/typography audit findings.
-    Includes Variable Candidate and Source Context columns.
-    
-    Args:
-        results: Dict containing font audit results
-        output_dir: Directory to save the report
-    
-    Returns:
-        Path to the generated CSV file
-    """
-    filename = f"font_audit_{generate_timestamp()}.csv"
-    filepath = os.path.join(output_dir, filename)
-    
-    font_issues = [i for i in results.get('issues', []) if i.get('type') == 'font']
-    
-    with open(filepath, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        
-        # Header with new columns
-        writer.writerow([
-            'Page URL',
-            'Element',
-            'CSS Selector',
-            'Property',
-            'Found Value',
-            'Variable Candidate',
-            'Font Size',
-            'Font Weight',
-            'Line Height',
-            'Source Context',
-            'Severity',
-            'Notes'
-        ])
-        
-        # Data rows
-        for issue in font_issues:
-            writer.writerow([
-                issue.get('page_url', ''),
-                issue.get('element', ''),
-                issue.get('selector', ''),
-                issue.get('property', ''),
-                issue.get('found_value', ''),
-                issue.get('variable_candidate', ''),
-                issue.get('font_size', ''),
-                issue.get('font_weight', ''),
-                issue.get('line_height', ''),
-                issue.get('source_context', ''),
-                issue.get('severity', 'medium'),
-                issue.get('notes', '')
-            ])
-    
-    return filepath
-
-
-def generate_spacing_report(results, output_dir):
-    """
-    Generate CSV report for spacing audit findings.
-    Includes Variable Candidate and Source Context columns.
-    
-    Args:
-        results: Dict containing spacing audit results
-        output_dir: Directory to save the report
-    
-    Returns:
-        Path to the generated CSV file
-    """
-    filename = f"spacing_audit_{generate_timestamp()}.csv"
-    filepath = os.path.join(output_dir, filename)
-    
-    spacing_issues = [i for i in results.get('issues', []) if i.get('type') == 'spacing']
-    
-    with open(filepath, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        
-        # Header with new columns
-        writer.writerow([
-            'Page URL',
-            'Element',
-            'CSS Selector',
-            'Property',
-            'Found Value',
-            'Variable Candidate',
-            'Match Type',
-            'Source Context',
-            'Severity',
-            'Notes'
-        ])
-        
-        # Data rows
-        for issue in spacing_issues:
-            writer.writerow([
-                issue.get('page_url', ''),
-                issue.get('element', ''),
-                issue.get('selector', ''),
-                issue.get('property', ''),
-                issue.get('found_value', ''),
-                issue.get('variable_candidate', ''),
-                issue.get('match_type', ''),
-                issue.get('source_context', ''),
-                issue.get('severity', 'medium'),
-                issue.get('notes', '')
-            ])
-    
-    return filepath
-
-
-def generate_image_report(results, output_dir):
-    """
-    Generate CSV report for image audit findings.
-    
-    Args:
-        results: Dict containing image audit results
-        output_dir: Directory to save the report
-    
-    Returns:
-        Path to the generated CSV file
-    """
-    filename = f"image_audit_{generate_timestamp()}.csv"
-    filepath = os.path.join(output_dir, filename)
-    
-    image_issues = [i for i in results.get('issues', []) if i.get('type') == 'image']
-    
-    with open(filepath, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.writer(f)
-        
-        # Header
-        writer.writerow([
-            'Page URL',
-            'Image URL',
-            'Alt Text',
-            'Issue Type',
-            'Current Size (KB)',
-            'Recommended Size (KB)',
-            'Dimensions',
-            'Format',
-            'Severity',
-            'Notes'
-        ])
-        
-        # Data rows
-        for issue in image_issues:
-            writer.writerow([
-                issue.get('page_url', ''),
-                issue.get('image_url', ''),
-                issue.get('alt_text', ''),
-                issue.get('issue_subtype', ''),
-                issue.get('current_size', ''),
-                issue.get('recommended_size', ''),
-                issue.get('dimensions', ''),
-                issue.get('format', ''),
-                issue.get('severity', 'medium'),
-                issue.get('notes', '')
-            ])
-    
-    return filepath
-
-
-def generate_seo_report(results, output_dir):
-    """
-    Generate CSV report for SEO audit findings.
-
-    Args:
-        results: Dict containing SEO audit results
-        output_dir: Directory to save the report
-
-    Returns:
-        Path to the generated CSV file
-    """
-    filename = f"seo_audit_{generate_timestamp()}.csv"
-    filepath = os.path.join(output_dir, filename)
-
-    seo_issues = [i for i in results.get('issues', []) if i.get('type') == 'seo']
 
     with open(filepath, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-
-        # Header
         writer.writerow([
-            'Page URL',
-            'Element',
-            'Property',
-            'Expected',
-            'Found',
-            'Status'
+            'Page URL', 'Element', 'Full Selector', 'Parent Context',
+            'Property', 'Expected', 'Found', 'Status', 'Source Context', 'Text Snippet'
         ])
-
-        # Data rows
-        for issue in seo_issues:
+        for issue in issues:
             writer.writerow([
                 issue.get('url', ''),
                 issue.get('element', ''),
+                issue.get('full_selector', ''),
+                issue.get('parent_context', ''),
                 issue.get('property', ''),
                 issue.get('expected', ''),
                 issue.get('found', ''),
-                issue.get('status', '')
+                issue.get('status', ''),
+                issue.get('source_context', ''),
+                issue.get('text_snippet', '')
             ])
-
     return filepath
 
 
-def generate_content_report(results, output_dir):
-    """
-    Generate CSV report for content audit findings.
-
-    Args:
-        results: Dict containing content audit results
-        output_dir: Directory to save the report
-
-    Returns:
-        Path to the generated CSV file
-    """
-    filename = f"content_audit_{generate_timestamp()}.csv"
+def generate_seo_report(issues, output_dir):
+    """Generate CSV report for SEO audit findings."""
+    filename = f"seo_audit_{generate_timestamp()}.csv"
     filepath = os.path.join(output_dir, filename)
-
-    content_issues = [i for i in results.get('issues', []) if i.get('type') == 'content']
 
     with open(filepath, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-
-        # Header
         writer.writerow([
-            'Page URL',
-            'Element',
-            'Property',
-            'Expected',
-            'Found',
-            'Status',
-            'Context'
+            'Page URL', 'Element', 'Property', 'Expected', 'Found', 'Status', 'Context'
         ])
-
-        # Data rows
-        for issue in content_issues:
+        for issue in issues:
             writer.writerow([
                 issue.get('url', ''),
                 issue.get('element', ''),
@@ -384,390 +165,579 @@ def generate_content_report(results, output_dir):
                 issue.get('status', ''),
                 issue.get('context', '')
             ])
-
     return filepath
 
 
-def generate_design_report(results, output_dir):
-    """
-    Generate CSV report for all design audit findings (colors, textures, sections).
-
-    Args:
-        results: Dict containing design audit results
-        output_dir: Directory to save the report
-
-    Returns:
-        Path to the generated CSV file
-    """
-    filename = f"design_audit_{generate_timestamp()}.csv"
+def generate_content_report(issues, output_dir):
+    """Generate CSV report for content audit findings."""
+    filename = f"content_audit_{generate_timestamp()}.csv"
     filepath = os.path.join(output_dir, filename)
-
-    # Include color, texture, and section types
-    design_issues = [i for i in results.get('issues', [])
-                     if i.get('type') in ('color', 'texture', 'section')]
 
     with open(filepath, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-
-        # Header
         writer.writerow([
-            'Page URL',
-            'Type',
-            'Element',
-            'Full Selector',
-            'Property',
-            'Expected',
-            'Found',
-            'Status',
-            'Source Context'
+            'Page URL', 'Element', 'Property', 'Expected', 'Found', 'Status', 'Context'
         ])
+        for issue in issues:
+            writer.writerow([
+                issue.get('url', ''),
+                issue.get('element', ''),
+                issue.get('property', ''),
+                issue.get('expected', ''),
+                issue.get('found', ''),
+                issue.get('status', ''),
+                issue.get('context', '')
+            ])
+    return filepath
 
-        # Data rows
-        for issue in design_issues:
+
+def generate_design_report(issues, output_dir):
+    """Generate CSV report for design audit findings (colors, textures, sections)."""
+    filename = f"design_audit_{generate_timestamp()}.csv"
+    filepath = os.path.join(output_dir, filename)
+
+    with open(filepath, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow([
+            'Page URL', 'Type', 'Element', 'Full Selector', 'Parent Context',
+            'Property', 'Expected', 'Found', 'Status', 'Source Context', 'Text Snippet'
+        ])
+        for issue in issues:
             writer.writerow([
                 issue.get('url', ''),
                 issue.get('type', ''),
                 issue.get('element', ''),
                 issue.get('full_selector', ''),
+                issue.get('parent_context', ''),
                 issue.get('property', ''),
                 issue.get('expected', ''),
                 issue.get('found', ''),
                 issue.get('status', ''),
-                issue.get('source_context', '')
+                issue.get('source_context', ''),
+                issue.get('text_snippet', '')
             ])
-
     return filepath
 
 
-def generate_variable_candidates_report(results, output_dir):
-    """
-    Generate a dedicated CSV report for all variable candidates.
-    This is a consolidated view of all hard-coded values that should be variables.
-    
-    Args:
-        results: Dict containing all audit results
-        output_dir: Directory to save the report
-    
-    Returns:
-        Path to the generated CSV file
-    """
+def generate_variable_candidates_report(issues, output_dir):
+    """Generate a dedicated CSV report for all variable candidates."""
+    candidates = [i for i in issues if i.get('variable_candidate')]
+    if not candidates:
+        return None
+
     filename = f"variable_candidates_{generate_timestamp()}.csv"
     filepath = os.path.join(output_dir, filename)
-    
-    # Filter issues that have variable candidates
-    candidates = [i for i in results.get('issues', []) if i.get('variable_candidate')]
-    
+
     with open(filepath, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        
-        # Header
         writer.writerow([
-            'Issue Type',
-            'Page URL',
-            'Element',
-            'CSS Selector',
-            'Property',
-            'Found Value',
-            'Variable Candidate',
-            'Match Type',
-            'Source Context',
-            'Severity',
-            'Remediation'
+            'Type', 'Page URL', 'Element', 'Property', 'Found Value',
+            'Variable Candidate', 'Source Context'
         ])
-        
-        # Data rows
         for issue in candidates:
-            # Generate remediation suggestion
-            var_name = issue.get('variable_candidate', '')
-            found_val = issue.get('found_value', '')
-            remediation = f"Replace '{found_val}' with 'var(--{var_name.lower().replace('/', '-')})'"
-            
             writer.writerow([
                 issue.get('type', ''),
-                issue.get('page_url', ''),
+                issue.get('url', ''),
                 issue.get('element', ''),
-                issue.get('selector', ''),
                 issue.get('property', ''),
-                found_val,
-                var_name,
-                issue.get('match_type', ''),
-                issue.get('source_context', ''),
-                issue.get('severity', 'medium'),
-                remediation
+                issue.get('found', ''),
+                issue.get('variable_candidate', ''),
+                issue.get('source_context', '')
             ])
-    
     return filepath
 
 
-def generate_summary_report(results, url, output_dir):
-    """
-    Generate a summary CSV with counts and overview.
-    Includes breakdown by source context (hiding spots).
-    
-    Args:
-        results: Dict containing all audit results
-        url: The audited site URL
-        output_dir: Directory to save the report
-    
-    Returns:
-        Path to the generated CSV file
-    """
+def generate_summary_report(issues, url, output_dir):
+    """Generate a summary CSV with counts and source context breakdown."""
     filename = f"audit_summary_{generate_timestamp()}.csv"
     filepath = os.path.join(output_dir, filename)
-    
-    issues = results.get('issues', [])
-    summary = results.get('summary', {})
 
-    # Count by type - match actual types from plugins
-    color_count = len([i for i in issues if i.get('type') == 'color'])
-    texture_count = len([i for i in issues if i.get('type') == 'texture'])
-    section_count = len([i for i in issues if i.get('type') == 'section'])
-    seo_count = len([i for i in issues if i.get('type') == 'seo'])
-    content_count = len([i for i in issues if i.get('type') == 'content'])
-    
-    # Count by severity
-    high_count = len([i for i in issues if i.get('severity') == 'high'])
-    medium_count = len([i for i in issues if i.get('severity') == 'medium'])
-    low_count = len([i for i in issues if i.get('severity') == 'low'])
-    
-    # Count by source context (hiding spots)
-    source_counts = summary.get('by_source_context', {})
-    if not source_counts:
-        # Build from issues if not in summary
-        for issue in issues:
-            source = issue.get('source_context', 'Unknown')
+    # Count by type
+    type_counts = {}
+    source_counts = {}
+    status_counts = {'pass': 0, 'warn': 0, 'fail': 0}
+
+    for issue in issues:
+        # Count by type
+        issue_type = issue.get('type', 'unknown')
+        type_counts[issue_type] = type_counts.get(issue_type, 0) + 1
+
+        # Count by source context
+        source = issue.get('source_context', 'Unknown')
+        status = str(issue.get('status', ''))
+
+        # Only count non-passing items in source breakdown
+        if '✅' not in status and 'Match' not in status:
             source_counts[source] = source_counts.get(source, 0) + 1
-    
-    # Count variable candidates
-    variable_candidate_count = len([i for i in issues if i.get('variable_candidate')])
-    
+
+        # Count by status
+        if '✅' in status or 'Match' in status:
+            status_counts['pass'] += 1
+        elif '⚠️' in status or 'Near' in status or 'Thin' in status:
+            status_counts['warn'] += 1
+        else:
+            status_counts['fail'] += 1
+
+    total = len(issues)
+    pass_rate = (status_counts['pass'] / total * 100) if total > 0 else 0
+
     with open(filepath, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        
+
         writer.writerow(['Audit Summary Report'])
         writer.writerow(['Generated', datetime.now().isoformat()])
-        writer.writerow(['Site URL', url])
+        writer.writerow(['Site URL', url or 'Unknown'])
         writer.writerow([])
-        
+
+        writer.writerow(['Overall Statistics'])
+        writer.writerow(['Total Checked', total])
+        writer.writerow(['Passed', status_counts['pass']])
+        writer.writerow(['Warnings', status_counts['warn']])
+        writer.writerow(['Failed', status_counts['fail']])
+        writer.writerow(['Pass Rate', f"{pass_rate:.1f}%"])
+        writer.writerow([])
+
         writer.writerow(['Issues by Type'])
         writer.writerow(['Type', 'Count'])
-        writer.writerow(['Colors', color_count])
-        writer.writerow(['Textures', texture_count])
-        writer.writerow(['Sections', section_count])
-        writer.writerow(['SEO', seo_count])
-        writer.writerow(['Content', content_count])
-        writer.writerow(['TOTAL', len(issues)])
+        for issue_type, count in sorted(type_counts.items()):
+            writer.writerow([issue_type.capitalize(), count])
         writer.writerow([])
-        
-        writer.writerow(['Issues by Severity'])
-        writer.writerow(['Severity', 'Count'])
-        writer.writerow(['High', high_count])
-        writer.writerow(['Medium', medium_count])
-        writer.writerow(['Low', low_count])
-        writer.writerow([])
-        
-        writer.writerow(['Issues by Source Context (Hiding Spots)'])
-        writer.writerow(['Source', 'Count'])
-        for source, count in sorted(source_counts.items(), key=lambda x: -x[1]):
-            writer.writerow([source, count])
-        writer.writerow([])
-        
-        writer.writerow(['Design System Linter'])
-        writer.writerow(['Variable Candidates Found', variable_candidate_count])
-        writer.writerow(['Percentage of Issues', f"{(variable_candidate_count / len(issues) * 100):.1f}%" if issues else "0%"])
-    
+
+        if source_counts:
+            writer.writerow(['Issues by Source Context (Hiding Spots)'])
+            writer.writerow(['Source', 'Count'])
+            for source, count in sorted(source_counts.items(), key=lambda x: -x[1]):
+                writer.writerow([source, count])
+
     return filepath
 
 
 # =============================================================================
-# HTML REPORT GENERATORS
+# HTML REPORT GENERATOR - Matches sophisticated report format
 # =============================================================================
 
-def generate_html_report(results, url, output_dir):
+def generate_html_report(issues, url, output_dir):
     """
-    Generate an HTML summary report with all audit findings.
-
-    Args:
-        results: Dict containing all audit results
-        url: The audited site URL
-        output_dir: Directory to save the report
-
-    Returns:
-        Path to the generated HTML file
+    Generate an interactive HTML report matching the sophisticated format with:
+    - Summary cards (Total, Passed, Warnings, Failed, Pass Rate)
+    - Issues by Source section with count chips
+    - Legend for source types
+    - Filterable table with Type, Status, Source dropdowns + search
+    - Color swatches for hex values
+    - Full Selector and Parent Context columns
     """
-    filename = f"audit_report_{generate_timestamp()}.html"
+    filename = f"audit_all_{generate_timestamp()}.html"
     filepath = os.path.join(output_dir, filename)
 
-    issues = results.get('issues', [])
+    # Extract domain for title
+    domain = 'Unknown Site'
+    if url:
+        parsed = urlparse(url)
+        domain = parsed.netloc or url.replace('https://', '').replace('http://', '').split('/')[0]
 
-    # Count by type
-    color_count = len([i for i in issues if i.get('type') == 'color'])
-    texture_count = len([i for i in issues if i.get('type') == 'texture'])
-    section_count = len([i for i in issues if i.get('type') == 'section'])
-    seo_count = len([i for i in issues if i.get('type') == 'seo'])
-    content_count = len([i for i in issues if i.get('type') == 'content'])
+    # Calculate statistics
+    total = len(issues)
+    pass_count = 0
+    warn_count = 0
+    fail_count = 0
 
-    # Count by status
-    pass_count = len([i for i in issues if 'Match' in str(i.get('status', '')) or 'range' in str(i.get('status', '')).lower()])
-    warn_count = len([i for i in issues if 'Near' in str(i.get('status', '')) or 'Review' in str(i.get('status', ''))])
-    fail_count = len([i for i in issues if 'Mismatch' in str(i.get('status', '')) or 'Missing' in str(i.get('status', '')) or 'Rogue' in str(i.get('status', ''))])
+    type_set = set()
+    source_counts = {}
 
-    html_content = f"""<!DOCTYPE html>
+    for issue in issues:
+        status = str(issue.get('status', ''))
+        issue_type = issue.get('type', 'unknown')
+        source = issue.get('source_context', 'Unknown')
+
+        type_set.add(issue_type)
+
+        if '✅' in status or 'Match' in status or 'range' in status.lower():
+            pass_count += 1
+        elif '⚠️' in status or 'Near' in status or 'Thin' in status or 'Review' in status:
+            warn_count += 1
+        else:
+            fail_count += 1
+            # Only count failing items in source breakdown
+            source_counts[source] = source_counts.get(source, 0) + 1
+
+    pass_rate = (pass_count / total * 100) if total > 0 else 0
+
+    # Build type options for filter
+    type_options = ''.join(f'<option value="{t}">{t}</option>' for t in sorted(type_set))
+
+    # Build source chips
+    source_chips = ''
+    for source, count in sorted(source_counts.items(), key=lambda x: -x[1]):
+        source_chips += f'<div class="source-tag">{escape_html(source)}<span class="count">{count}</span></div>\n'
+
+    # Build table rows
+    table_rows = ''
+    for issue in issues:
+        status = str(issue.get('status', ''))
+        issue_type = issue.get('type', 'unknown')
+        source = issue.get('source_context', '') or ''
+        found = issue.get('found', '') or ''
+
+        # Determine status class and data attribute
+        if '✅' in status or 'Match' in status or 'range' in status.lower():
+            status_class = 'status-pass'
+            status_data = 'pass'
+        elif '⚠️' in status or 'Near' in status or 'Thin' in status or 'Review' in status:
+            status_class = 'status-warn'
+            status_data = 'warn'
+        else:
+            status_class = 'status-fail'
+            status_data = 'fail'
+
+        # Determine source class
+        source_lower = source.lower()
+        if 'inline' in source_lower:
+            source_class = 'source-inline'
+            source_data = 'inline'
+        elif 'class' in source_lower:
+            source_class = 'source-class'
+            source_data = 'class'
+        elif 'global' in source_lower:
+            source_class = 'source-global'
+            source_data = 'global'
+        elif 'embed' in source_lower or 'custom' in source_lower:
+            source_class = 'source-embed'
+            source_data = 'embed'
+        elif 'external' in source_lower:
+            source_class = 'source-external'
+            source_data = 'external'
+        else:
+            source_class = 'source-external'
+            source_data = 'other'
+
+        # Color swatch for hex values
+        color_swatch = ''
+        if found.startswith('#'):
+            color_swatch = f'<span class="color-swatch" style="background-color: {escape_html(found)};"></span>'
+
+        # Build row
+        row_url = issue.get('url', '')
+        full_selector = issue.get('full_selector', '')
+        parent_context = issue.get('parent_context', '')
+        prop = issue.get('property', '')
+        expected = issue.get('expected', '')
+        text_snippet = issue.get('text_snippet', '')
+
+        table_rows += f'''<tr data-type="{escape_html(issue_type)}" data-status="{status_data}" data-source="{source_data}">
+                    <td title="{escape_html(row_url)}">{escape_html(truncate(row_url, 40))}</td>
+                    <td>{escape_html(issue_type)}</td>
+                    <td><span class="full-selector" title="{escape_html(full_selector)}">{escape_html(truncate(full_selector, 45))}</span></td>
+                    <td><span class="parent-context" title="{escape_html(parent_context)}">{escape_html(truncate(parent_context, 35))}</span></td>
+                    <td>{escape_html(prop)}</td>
+                    <td>{escape_html(truncate(expected, 30))}</td>
+                    <td>{color_swatch}{escape_html(found)}</td>
+                    <td class="{status_class}">{escape_html(status)}</td>
+                    <td><span class="source-context {source_class}">{escape_html(truncate(source, 50))}</span></td>
+                    <td><span class="text-snippet" title="{escape_html(text_snippet)}">{escape_html(truncate(text_snippet, 30))}</span></td>
+                </tr>
+'''
+
+    html = f'''<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Audit Report - {url}</title>
+    <title>Audit Report: {escape_html(domain)}</title>
     <style>
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 1200px; margin: 0 auto; padding: 20px; background: #f5f5f5; }}
-        header {{ background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }}
-        h1 {{ font-size: 1.5rem; margin-bottom: 5px; }}
-        .meta {{ opacity: 0.8; font-size: 0.9rem; }}
-        .summary {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 20px; }}
-        .stat-card {{ background: white; padding: 15px; border-radius: 8px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-        .stat-value {{ font-size: 2rem; font-weight: bold; }}
-        .stat-label {{ font-size: 0.85rem; color: #666; }}
-        .pass {{ color: #27ae60; }}
-        .warn {{ color: #f39c12; }}
-        .fail {{ color: #e74c3c; }}
-        section {{ background: white; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden; }}
-        section h2 {{ background: #34495e; color: white; padding: 12px 20px; font-size: 1.1rem; }}
-        table {{ width: 100%; border-collapse: collapse; font-size: 0.9rem; }}
-        th, td {{ padding: 10px 15px; text-align: left; border-bottom: 1px solid #eee; }}
-        th {{ background: #ecf0f1; font-weight: 600; }}
-        tr:hover {{ background: #f8f9fa; }}
-        .status-pass {{ color: #27ae60; }}
-        .status-warn {{ color: #f39c12; }}
-        .status-fail {{ color: #e74c3c; }}
-        .truncate {{ max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-        footer {{ text-align: center; padding: 20px; color: #666; font-size: 0.85rem; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #1a1a2e;
+            background: #f5f5f5;
+            padding: 2rem;
+        }}
+        .container {{ max-width: 1600px; margin: 0 auto; }}
+        h1 {{ color: #002d68; margin-bottom: 0.5rem; }}
+        h2 {{ color: #003153; margin: 1.5rem 0 1rem 0; font-size: 1.25rem; }}
+        .subtitle {{ color: #6b7280; margin-bottom: 2rem; }}
+
+        .summary-cards {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }}
+        .card {{
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .card h3 {{
+            font-size: 0.875rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }}
+        .card .value {{
+            font-size: 2rem;
+            font-weight: bold;
+            color: #002d68;
+        }}
+        .card.passed .value {{ color: #059669; }}
+        .card.warnings .value {{ color: #d97706; }}
+        .card.failed .value {{ color: #dc2626; }}
+
+        .source-breakdown {{
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .source-breakdown h2 {{ margin-top: 0; }}
+        .source-list {{
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }}
+        .source-tag {{
+            background: #f3f4f6;
+            border-radius: 4px;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }}
+        .source-tag .count {{
+            font-weight: bold;
+            color: #dc2626;
+            margin-left: 0.5rem;
+        }}
+
+        .legend {{
+            background: white;
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }}
+        .legend-item {{
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+        }}
+
+        .filter-bar {{
+            margin-bottom: 1rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }}
+        .filter-bar select, .filter-bar input {{
+            padding: 0.5rem 1rem;
+            border: 1px solid #e5e5e5;
+            border-radius: 4px;
+            font-size: 0.875rem;
+        }}
+        .filter-bar input[type="text"] {{ min-width: 250px; }}
+        .filter-bar label {{ font-size: 0.875rem; color: #6b7280; }}
+
+        .table-container {{ overflow-x: auto; }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            font-size: 0.875rem;
+        }}
+        th {{
+            background: #002d68;
+            color: white;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            white-space: nowrap;
+        }}
+        td {{
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid #e5e5e5;
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+        tr:hover td {{ background: #f9fafb; }}
+
+        .status-pass {{ color: #059669; font-weight: 600; }}
+        .status-warn {{ color: #d97706; font-weight: 600; }}
+        .status-fail {{ color: #dc2626; font-weight: 600; }}
+
+        .full-selector {{
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.8rem;
+            background: #f3f4f6;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            color: #4c1d95;
+        }}
+        .parent-context {{
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.75rem;
+            color: #6b7280;
+        }}
+        .source-context {{
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            white-space: nowrap;
+        }}
+        .source-inline {{ background: #fef3c7; color: #92400e; }}
+        .source-class {{ background: #dbeafe; color: #1e40af; }}
+        .source-global {{ background: #f3e8ff; color: #6b21a8; }}
+        .source-embed {{ background: #fee2e2; color: #991b1b; }}
+        .source-external {{ background: #e5e7eb; color: #374151; }}
+
+        .color-swatch {{
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            border: 1px solid rgba(0,0,0,0.2);
+            vertical-align: middle;
+            margin-right: 0.5rem;
+        }}
+        .text-snippet {{
+            font-size: 0.75rem;
+            color: #6b7280;
+            font-style: italic;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }}
     </style>
 </head>
 <body>
-    <header>
-        <h1>Site Audit Report</h1>
-        <p class="meta">{url} | Generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
-    </header>
+    <div class="container">
+        <h1>Audit Report: {escape_html(domain)}</h1>
+        <p class="subtitle">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Site: {escape_html(domain)}</p>
 
-    <div class="summary">
-        <div class="stat-card">
-            <div class="stat-value">{len(issues)}</div>
-            <div class="stat-label">Total Issues</div>
+        <div class="summary-cards">
+            <div class="card">
+                <h3>Total Checked</h3>
+                <div class="value">{total}</div>
+            </div>
+            <div class="card passed">
+                <h3>Passed ✅</h3>
+                <div class="value">{pass_count}</div>
+            </div>
+            <div class="card warnings">
+                <h3>Warnings ⚠️</h3>
+                <div class="value">{warn_count}</div>
+            </div>
+            <div class="card failed">
+                <h3>Failed ❌</h3>
+                <div class="value">{fail_count}</div>
+            </div>
+            <div class="card">
+                <h3>Pass Rate</h3>
+                <div class="value">{pass_rate:.1f}%</div>
+            </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-value pass">{pass_count}</div>
-            <div class="stat-label">Passed</div>
+
+        <div class="source-breakdown">
+            <h2>🔍 Issues by Source ("Hiding Spot")</h2>
+            <p style="color: #6b7280; font-size: 0.875rem;">Where non-passing styles are coming from:</p>
+            <div class="source-list">
+                {source_chips}
+            </div>
         </div>
-        <div class="stat-card">
-            <div class="stat-value warn">{warn_count}</div>
-            <div class="stat-label">Warnings</div>
+
+        <div class="legend">
+            <div class="legend-item"><span class="source-context source-inline">Inline Style</span> Directly on element</div>
+            <div class="legend-item"><span class="source-context source-class">Class Style</span> From Webflow class</div>
+            <div class="legend-item"><span class="source-context source-global">Global Style</span> Inherited from Body</div>
+            <div class="legend-item"><span class="source-context source-embed">Custom Code</span> From Embed block</div>
+            <div class="legend-item"><span class="source-context source-external">External CSS</span> From stylesheet</div>
         </div>
-        <div class="stat-card">
-            <div class="stat-value fail">{fail_count}</div>
-            <div class="stat-label">Failed</div>
+
+        <div class="filter-bar">
+            <label>Filter by:</label>
+            <select id="typeFilter" onchange="filterTable()">
+                <option value="">All Types</option>
+                {type_options}
+            </select>
+            <select id="statusFilter" onchange="filterTable()">
+                <option value="">All Statuses</option>
+                <option value="pass">✅ Passed</option>
+                <option value="warn">⚠️ Warnings</option>
+                <option value="fail">❌ Failed</option>
+            </select>
+            <select id="sourceFilter" onchange="filterTable()">
+                <option value="">All Sources</option>
+                <option value="inline">Inline Style</option>
+                <option value="class">Class Style</option>
+                <option value="global">Global Style</option>
+                <option value="embed">Custom Code</option>
+                <option value="external">External CSS</option>
+            </select>
+            <input type="text" id="searchInput" placeholder="Search selectors, properties..." onkeyup="filterTable()">
+        </div>
+
+        <div class="table-container">
+            <table id="resultsTable">
+                <thead>
+                    <tr>
+                        <th>URL</th>
+                        <th>Type</th>
+                        <th>Full Selector</th>
+                        <th>Parent Context</th>
+                        <th>Property</th>
+                        <th>Expected</th>
+                        <th>Found</th>
+                        <th>Status</th>
+                        <th>Source</th>
+                        <th>Text Snippet</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {table_rows}
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <div class="summary">
-        <div class="stat-card"><div class="stat-value">{color_count}</div><div class="stat-label">Colors</div></div>
-        <div class="stat-card"><div class="stat-value">{texture_count}</div><div class="stat-label">Textures</div></div>
-        <div class="stat-card"><div class="stat-value">{section_count}</div><div class="stat-label">Sections</div></div>
-        <div class="stat-card"><div class="stat-value">{seo_count}</div><div class="stat-label">SEO</div></div>
-        <div class="stat-card"><div class="stat-value">{content_count}</div><div class="stat-label">Content</div></div>
-    </div>
-"""
+    <script>
+        function filterTable() {{
+            const typeFilter = document.getElementById('typeFilter').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const sourceFilter = document.getElementById('sourceFilter').value;
+            const searchInput = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#resultsTable tbody tr');
 
-    def get_status_class(status):
-        status_str = str(status)
-        if 'Match' in status_str or 'range' in status_str.lower():
-            return 'status-pass'
-        elif 'Near' in status_str or 'Review' in status_str or 'Thin' in status_str:
-            return 'status-warn'
-        return 'status-fail'
+            rows.forEach(row => {{
+                const type = row.dataset.type.toLowerCase();
+                const status = row.dataset.status;
+                const source = row.dataset.source;
+                const text = row.textContent.toLowerCase();
 
-    def escape_html(text):
-        if text is None:
-            return ''
-        return str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                const typeMatch = !typeFilter || type.includes(typeFilter);
+                const statusMatch = !statusFilter || status === statusFilter;
+                const sourceMatch = !sourceFilter || source === sourceFilter;
+                const searchMatch = !searchInput || text.includes(searchInput);
 
-    # Design issues section
-    design_issues = [i for i in issues if i.get('type') in ('color', 'texture', 'section')]
-    if design_issues:
-        html_content += """
-    <section>
-        <h2>Design Audit ({} issues)</h2>
-        <table>
-            <tr><th>Type</th><th>Element</th><th>Property</th><th>Expected</th><th>Found</th><th>Status</th></tr>
-""".format(len(design_issues))
-        for issue in design_issues[:100]:  # Limit to 100 for performance
-            html_content += f"""            <tr>
-                <td>{escape_html(issue.get('type', ''))}</td>
-                <td class="truncate">{escape_html(issue.get('element', ''))}</td>
-                <td>{escape_html(issue.get('property', ''))}</td>
-                <td class="truncate">{escape_html(issue.get('expected', ''))}</td>
-                <td>{escape_html(issue.get('found', ''))}</td>
-                <td class="{get_status_class(issue.get('status'))}">{escape_html(issue.get('status', ''))}</td>
-            </tr>
-"""
-        if len(design_issues) > 100:
-            html_content += f'            <tr><td colspan="6">... and {len(design_issues) - 100} more issues (see CSV for full list)</td></tr>\n'
-        html_content += "        </table>\n    </section>\n"
-
-    # SEO issues section
-    seo_issues = [i for i in issues if i.get('type') == 'seo']
-    if seo_issues:
-        html_content += """
-    <section>
-        <h2>SEO Audit ({} issues)</h2>
-        <table>
-            <tr><th>Element</th><th>Property</th><th>Expected</th><th>Found</th><th>Status</th></tr>
-""".format(len(seo_issues))
-        for issue in seo_issues[:100]:
-            html_content += f"""            <tr>
-                <td>{escape_html(issue.get('element', ''))}</td>
-                <td>{escape_html(issue.get('property', ''))}</td>
-                <td class="truncate">{escape_html(issue.get('expected', ''))}</td>
-                <td class="truncate">{escape_html(issue.get('found', ''))}</td>
-                <td class="{get_status_class(issue.get('status'))}">{escape_html(issue.get('status', ''))}</td>
-            </tr>
-"""
-        if len(seo_issues) > 100:
-            html_content += f'            <tr><td colspan="5">... and {len(seo_issues) - 100} more issues</td></tr>\n'
-        html_content += "        </table>\n    </section>\n"
-
-    # Content issues section
-    content_issues = [i for i in issues if i.get('type') == 'content']
-    if content_issues:
-        html_content += """
-    <section>
-        <h2>Content Audit ({} issues)</h2>
-        <table>
-            <tr><th>Element</th><th>Property</th><th>Expected</th><th>Found</th><th>Status</th></tr>
-""".format(len(content_issues))
-        for issue in content_issues[:100]:
-            html_content += f"""            <tr>
-                <td>{escape_html(issue.get('element', ''))}</td>
-                <td>{escape_html(issue.get('property', ''))}</td>
-                <td class="truncate">{escape_html(issue.get('expected', ''))}</td>
-                <td class="truncate">{escape_html(issue.get('found', ''))}</td>
-                <td class="{get_status_class(issue.get('status'))}">{escape_html(issue.get('status', ''))}</td>
-            </tr>
-"""
-        if len(content_issues) > 100:
-            html_content += f'            <tr><td colspan="5">... and {len(content_issues) - 100} more issues</td></tr>\n'
-        html_content += "        </table>\n    </section>\n"
-
-    html_content += """
-    <footer>
-        Generated by Site Audit Tool
-    </footer>
+                row.style.display = typeMatch && statusMatch && sourceMatch && searchMatch ? '' : 'none';
+            }});
+        }}
+    </script>
 </body>
 </html>
-"""
+'''
 
     with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(html_content)
+        f.write(html)
 
     return filepath
 
@@ -776,13 +746,14 @@ def generate_html_report(results, url, output_dir):
 # MAIN ENTRY POINT (Required by main.py)
 # =============================================================================
 
-def generate_all_reports(results, url, site_path=None):
+def generate_all_reports(results, url=None, site_path=None):
     """
-    Generate all CSV reports for the audit results.
+    Generate all reports (CSV, HTML, summary) for the audit results.
     This is the main entry point called by main.py.
 
     Args:
-        results: List of audit result dicts OR dict with 'issues' key
+        results: List of audit result dicts from main.py
+                 (NOT a dict with 'issues' key - it's the raw list)
         url: The audited site URL
         site_path: Path to site directory (e.g., ~/sites/lastingchange.co)
 
@@ -791,63 +762,57 @@ def generate_all_reports(results, url, site_path=None):
     """
     output_dir = get_site_report_dir(url, site_path)
 
-    print(f"Generating CSV reports in: {output_dir}")
+    print(f"Generating reports in: {output_dir}")
 
-    # Handle both list format (from engine) and dict format (legacy)
-    if isinstance(results, list):
-        issues = results
-        # Wrap in dict for sub-functions that expect it
-        results = {'issues': issues}
-    else:
+    # Handle both list and dict formats
+    if isinstance(results, dict):
         issues = results.get('issues', [])
+    else:
+        issues = results
 
-    generated_files = []
+    generated_files = {}
 
-    # Count issues by actual type
-    design_issues = [i for i in issues if i.get('type') in ('color', 'texture', 'section')]
+    # Categorize issues by type
+    color_issues = [i for i in issues if i.get('type') == 'color']
+    texture_issues = [i for i in issues if i.get('type') == 'texture']
+    section_issues = [i for i in issues if i.get('type') == 'section']
     seo_issues = [i for i in issues if i.get('type') == 'seo']
     content_issues = [i for i in issues if i.get('type') == 'content']
 
-    # Generate Design report (colors, textures, sections)
+    # Design issues = color + texture + section
+    design_issues = color_issues + texture_issues + section_issues
+
+    # Generate type-specific CSV reports
     if design_issues:
-        path = generate_design_report(results, output_dir)
-        generated_files.append(path)
+        path = generate_design_report(design_issues, output_dir)
+        generated_files['design'] = path
         print(f"  ✓ Design report: {os.path.basename(path)} ({len(design_issues)} issues)")
 
-    # Generate SEO report
     if seo_issues:
-        path = generate_seo_report(results, output_dir)
-        generated_files.append(path)
+        path = generate_seo_report(seo_issues, output_dir)
+        generated_files['seo'] = path
         print(f"  ✓ SEO report: {os.path.basename(path)} ({len(seo_issues)} issues)")
 
-    # Generate Content report
     if content_issues:
-        path = generate_content_report(results, output_dir)
-        generated_files.append(path)
+        path = generate_content_report(content_issues, output_dir)
+        generated_files['content'] = path
         print(f"  ✓ Content report: {os.path.basename(path)} ({len(content_issues)} issues)")
 
-    # Generate variable candidates report (Design System Linter output)
-    variable_candidates = [i for i in issues if i.get('variable_candidate')]
-    if variable_candidates:
-        path = generate_variable_candidates_report(results, output_dir)
-        generated_files.append(path)
-        print(f"  ✓ Variable candidates: {os.path.basename(path)} ({len(variable_candidates)} candidates)")
-    
-    # Always generate summary CSV
-    summary_path = generate_summary_report(results, url, output_dir)
-    generated_files.append(summary_path)
+    # Generate variable candidates report
+    variable_candidates_path = generate_variable_candidates_report(issues, output_dir)
+    if variable_candidates_path:
+        generated_files['variable_candidates'] = variable_candidates_path
+        candidate_count = sum(1 for i in issues if i.get('variable_candidate'))
+        print(f"  ✓ Variable candidates: {os.path.basename(variable_candidates_path)} ({candidate_count} candidates)")
+
+    # Generate summary CSV
+    summary_path = generate_summary_report(issues, url, output_dir)
+    generated_files['summary'] = summary_path
     print(f"  ✓ Summary report: {os.path.basename(summary_path)}")
 
-    # Always generate HTML report
-    html_path = generate_html_report(results, url, output_dir)
-    generated_files.append(html_path)
+    # Generate HTML report
+    html_path = generate_html_report(issues, url, output_dir)
+    generated_files['html'] = html_path
     print(f"  ✓ HTML report: {os.path.basename(html_path)}")
 
-    # Return dict of all generated files
-    return {
-        'summary': summary_path,
-        'html': html_path,
-        'all_files': generated_files,
-        'output_dir': output_dir,
-        'issue_count': len(issues)
-    }
+    return generated_files
