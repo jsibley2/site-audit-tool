@@ -814,6 +814,424 @@ def generate_html_report(issues, url, output_dir):
 
 
 # =============================================================================
+# ROGUE COLORS SUMMARY HTML REPORT
+# =============================================================================
+
+def generate_rogue_colors_summary_html(issues, url, output_dir):
+    """
+    Generate an HTML summary report for rogue (non-matching) colors showing:
+    - Overall counts by color value
+    - Counts by page
+    - Counts by source context
+    """
+    filename = f"rogue_colors_summary_{generate_timestamp()}.html"
+    filepath = os.path.join(output_dir, filename)
+
+    # Extract domain for title
+    domain = 'Unknown Site'
+    if url:
+        parsed = urlparse(url)
+        domain = parsed.netloc or url.replace('https://', '').replace('http://', '').split('/')[0]
+
+    # Filter for rogue colors (color type + not passing)
+    rogue_colors = []
+    for issue in issues:
+        if issue.get('type') != 'color':
+            continue
+        status = str(issue.get('status', ''))
+        if '✅' in status or 'Match' in status or 'range' in status.lower():
+            continue  # Skip passing colors
+        rogue_colors.append(issue)
+
+    if not rogue_colors:
+        return None
+
+    # Aggregate by color value
+    color_counts = {}
+    for issue in rogue_colors:
+        color = issue.get('found', 'Unknown')
+        if color not in color_counts:
+            color_counts[color] = {'count': 0, 'pages': set(), 'sources': set(), 'properties': set()}
+        color_counts[color]['count'] += 1
+        color_counts[color]['pages'].add(issue.get('url', 'Unknown'))
+        color_counts[color]['sources'].add(issue.get('source_context', 'Unknown'))
+        color_counts[color]['properties'].add(issue.get('property', 'Unknown'))
+
+    # Aggregate by page
+    page_counts = {}
+    for issue in rogue_colors:
+        page = issue.get('url', 'Unknown')
+        if page not in page_counts:
+            page_counts[page] = {'count': 0, 'colors': set(), 'sources': set()}
+        page_counts[page]['count'] += 1
+        page_counts[page]['colors'].add(issue.get('found', 'Unknown'))
+        page_counts[page]['sources'].add(issue.get('source_context', 'Unknown'))
+
+    # Aggregate by source
+    source_counts = {}
+    for issue in rogue_colors:
+        source = issue.get('source_context', 'Unknown')
+        if source not in source_counts:
+            source_counts[source] = {'count': 0, 'colors': set(), 'pages': set()}
+        source_counts[source]['count'] += 1
+        source_counts[source]['colors'].add(issue.get('found', 'Unknown'))
+        source_counts[source]['pages'].add(issue.get('url', 'Unknown'))
+
+    # Build color rows (sorted by count descending)
+    color_rows = ''
+    for color, data in sorted(color_counts.items(), key=lambda x: -x[1]['count']):
+        swatch = ''
+        if color.startswith('#'):
+            swatch = f'<span class="color-swatch" style="background-color: {escape_html(color)};"></span>'
+        pages_list = ', '.join(sorted(data['pages']))
+        sources_list = ', '.join(sorted(data['sources']))
+        props_list = ', '.join(sorted(data['properties']))
+        color_rows += f'''<tr>
+            <td>{swatch}<code>{escape_html(color)}</code></td>
+            <td class="count-cell">{data['count']}</td>
+            <td>{len(data['pages'])}</td>
+            <td title="{escape_html(props_list)}">{escape_html(truncate(props_list, 40))}</td>
+            <td title="{escape_html(sources_list)}">{escape_html(truncate(sources_list, 40))}</td>
+        </tr>
+'''
+
+    # Build page rows (sorted by count descending)
+    page_rows = ''
+    for page, data in sorted(page_counts.items(), key=lambda x: -x[1]['count']):
+        colors_preview = ', '.join(list(data['colors'])[:5])
+        if len(data['colors']) > 5:
+            colors_preview += f' (+{len(data["colors"]) - 5} more)'
+        sources_list = ', '.join(sorted(data['sources']))
+        page_rows += f'''<tr>
+            <td title="{escape_html(page)}">{escape_html(truncate(page, 50))}</td>
+            <td class="count-cell">{data['count']}</td>
+            <td>{len(data['colors'])}</td>
+            <td title="{escape_html(sources_list)}">{escape_html(truncate(sources_list, 40))}</td>
+        </tr>
+'''
+
+    # Build source rows (sorted by count descending)
+    source_rows = ''
+    for source, data in sorted(source_counts.items(), key=lambda x: -x[1]['count']):
+        source_lower = source.lower()
+        if 'inline' in source_lower:
+            source_class = 'source-inline'
+        elif 'class' in source_lower:
+            source_class = 'source-class'
+        elif 'global' in source_lower:
+            source_class = 'source-global'
+        elif 'embed' in source_lower or 'custom' in source_lower:
+            source_class = 'source-embed'
+        else:
+            source_class = 'source-external'
+        colors_preview = ', '.join(list(data['colors'])[:5])
+        if len(data['colors']) > 5:
+            colors_preview += f' (+{len(data["colors"]) - 5} more)'
+        source_rows += f'''<tr>
+            <td><span class="source-badge {source_class}">{escape_html(source)}</span></td>
+            <td class="count-cell">{data['count']}</td>
+            <td>{len(data['colors'])}</td>
+            <td>{len(data['pages'])}</td>
+        </tr>
+'''
+
+    total_rogue = len(rogue_colors)
+    unique_colors = len(color_counts)
+    pages_affected = len(page_counts)
+
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rogue Colors Summary: {escape_html(domain)}</title>
+    <style>
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #1a1a2e;
+            background: #f5f5f5;
+            padding: 2rem;
+        }}
+        .container {{ max-width: 1400px; margin: 0 auto; }}
+        h1 {{ color: #dc2626; margin-bottom: 0.5rem; }}
+        h2 {{ color: #003153; margin: 2rem 0 1rem 0; font-size: 1.25rem; border-bottom: 2px solid #e5e5e5; padding-bottom: 0.5rem; }}
+        .subtitle {{ color: #6b7280; margin-bottom: 2rem; }}
+
+        .summary-cards {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }}
+        .card {{
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-left: 4px solid #dc2626;
+        }}
+        .card h3 {{
+            font-size: 0.875rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }}
+        .card .value {{
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #dc2626;
+        }}
+        .card.neutral .value {{ color: #002d68; }}
+        .card.neutral {{ border-left-color: #002d68; }}
+
+        .section {{
+            background: white;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }}
+        .section h2 {{ margin-top: 0; border: none; padding: 0; margin-bottom: 1rem; }}
+
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }}
+        th {{
+            background: #002d68;
+            color: white;
+            padding: 0.75rem 1rem;
+            text-align: left;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+        }}
+        th:hover {{ background: #003d88; }}
+        th .sort-arrow {{
+            display: inline-block;
+            margin-left: 0.5rem;
+            opacity: 0.5;
+            font-size: 0.7rem;
+        }}
+        th.sort-asc .sort-arrow::after {{ content: '▲'; opacity: 1; }}
+        th.sort-desc .sort-arrow::after {{ content: '▼'; opacity: 1; }}
+        th:not(.sort-asc):not(.sort-desc) .sort-arrow::after {{ content: '▲▼'; font-size: 0.6rem; }}
+        td {{
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid #e5e5e5;
+        }}
+        tr:hover td {{ background: #f9fafb; }}
+        .count-cell {{
+            font-weight: bold;
+            color: #dc2626;
+            font-size: 1.1rem;
+        }}
+
+        .color-swatch {{
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid rgba(0,0,0,0.2);
+            vertical-align: middle;
+            margin-right: 0.5rem;
+        }}
+        code {{
+            background: #f3f4f6;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            font-size: 0.85rem;
+        }}
+
+        .source-badge {{
+            font-size: 0.8rem;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            white-space: nowrap;
+        }}
+        .source-inline {{ background: #fef3c7; color: #92400e; }}
+        .source-class {{ background: #dbeafe; color: #1e40af; }}
+        .source-global {{ background: #f3e8ff; color: #6b21a8; }}
+        .source-embed {{ background: #fee2e2; color: #991b1b; }}
+        .source-external {{ background: #e5e7eb; color: #374151; }}
+
+        .tabs {{
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }}
+        .tab {{
+            padding: 0.5rem 1rem;
+            background: #e5e7eb;
+            border: none;
+            border-radius: 4px 4px 0 0;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }}
+        .tab.active {{
+            background: #002d68;
+            color: white;
+        }}
+        .tab-content {{
+            display: none;
+        }}
+        .tab-content.active {{
+            display: block;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Rogue Colors Summary</h1>
+        <p class="subtitle">Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Site: {escape_html(domain)}</p>
+
+        <div class="summary-cards">
+            <div class="card">
+                <h3>Total Rogue Colors</h3>
+                <div class="value">{total_rogue}</div>
+            </div>
+            <div class="card neutral">
+                <h3>Unique Colors</h3>
+                <div class="value">{unique_colors}</div>
+            </div>
+            <div class="card neutral">
+                <h3>Pages Affected</h3>
+                <div class="value">{pages_affected}</div>
+            </div>
+            <div class="card neutral">
+                <h3>Source Types</h3>
+                <div class="value">{len(source_counts)}</div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('colors')">By Color</button>
+            <button class="tab" onclick="showTab('pages')">By Page</button>
+            <button class="tab" onclick="showTab('sources')">By Source</button>
+        </div>
+
+        <div id="colors" class="tab-content active">
+            <div class="section">
+                <h2>🔴 Rogue Colors by Value</h2>
+                <p style="color: #6b7280; margin-bottom: 1rem;">Colors found that don't match the design system palette:</p>
+                <table id="colorsTable">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable('colorsTable', 0)">Color<span class="sort-arrow"></span></th>
+                            <th onclick="sortTable('colorsTable', 1)">Occurrences<span class="sort-arrow"></span></th>
+                            <th onclick="sortTable('colorsTable', 2)">Pages<span class="sort-arrow"></span></th>
+                            <th onclick="sortTable('colorsTable', 3)">Properties<span class="sort-arrow"></span></th>
+                            <th onclick="sortTable('colorsTable', 4)">Sources<span class="sort-arrow"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {color_rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="pages" class="tab-content">
+            <div class="section">
+                <h2>📄 Rogue Colors by Page</h2>
+                <p style="color: #6b7280; margin-bottom: 1rem;">Pages with the most rogue color issues:</p>
+                <table id="pagesTable">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable('pagesTable', 0)">Page URL<span class="sort-arrow"></span></th>
+                            <th onclick="sortTable('pagesTable', 1)">Issues<span class="sort-arrow"></span></th>
+                            <th onclick="sortTable('pagesTable', 2)">Unique Colors<span class="sort-arrow"></span></th>
+                            <th onclick="sortTable('pagesTable', 3)">Sources<span class="sort-arrow"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {page_rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="sources" class="tab-content">
+            <div class="section">
+                <h2>📍 Rogue Colors by Source</h2>
+                <p style="color: #6b7280; margin-bottom: 1rem;">Where the rogue colors are coming from (hiding spots):</p>
+                <table id="sourcesTable">
+                    <thead>
+                        <tr>
+                            <th onclick="sortTable('sourcesTable', 0)">Source<span class="sort-arrow"></span></th>
+                            <th onclick="sortTable('sourcesTable', 1)">Issues<span class="sort-arrow"></span></th>
+                            <th onclick="sortTable('sourcesTable', 2)">Unique Colors<span class="sort-arrow"></span></th>
+                            <th onclick="sortTable('sourcesTable', 3)">Pages Affected<span class="sort-arrow"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {source_rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sortState = {{}};
+
+        function showTab(tabId) {{
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            document.querySelector(`[onclick="showTab('${{tabId}}')"]`).classList.add('active');
+        }}
+
+        function sortTable(tableId, colIndex) {{
+            const table = document.getElementById(tableId);
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const headers = table.querySelectorAll('th');
+
+            const stateKey = tableId + '_' + colIndex;
+            sortState[stateKey] = !sortState[stateKey];
+            const sortAsc = sortState[stateKey];
+
+            // Update header classes
+            headers.forEach((th, i) => {{
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (i === colIndex) {{
+                    th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+                }}
+            }});
+
+            rows.sort((a, b) => {{
+                const aText = a.cells[colIndex].textContent.trim().toLowerCase();
+                const bText = b.cells[colIndex].textContent.trim().toLowerCase();
+                const aNum = parseFloat(aText);
+                const bNum = parseFloat(bText);
+                if (!isNaN(aNum) && !isNaN(bNum)) {{
+                    return sortAsc ? aNum - bNum : bNum - aNum;
+                }}
+                if (aText < bText) return sortAsc ? -1 : 1;
+                if (aText > bText) return sortAsc ? 1 : -1;
+                return 0;
+            }});
+
+            rows.forEach(row => tbody.appendChild(row));
+        }}
+    </script>
+</body>
+</html>
+'''
+
+    with open(filepath, 'w', encoding='utf-8') as f:
+        f.write(html)
+
+    return filepath
+
+
+# =============================================================================
 # MAIN ENTRY POINT (Required by main.py)
 # =============================================================================
 
@@ -858,6 +1276,14 @@ def generate_all_reports(results, url=None, site_path=None):
         path = generate_design_report(design_issues, output_dir)
         generated_files['design'] = path
         print(f"  ✓ Design report: {os.path.basename(path)} ({len(design_issues)} issues)")
+
+    # Generate rogue colors summary HTML
+    if color_issues:
+        rogue_path = generate_rogue_colors_summary_html(color_issues, url, output_dir)
+        if rogue_path:
+            generated_files['rogue_colors'] = rogue_path
+            rogue_count = sum(1 for i in color_issues if '✅' not in str(i.get('status', '')) and 'Match' not in str(i.get('status', '')))
+            print(f"  ✓ Rogue colors summary: {os.path.basename(rogue_path)} ({rogue_count} rogue colors)")
 
     if seo_issues:
         path = generate_seo_report(seo_issues, output_dir)
