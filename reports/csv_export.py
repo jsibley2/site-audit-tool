@@ -560,6 +560,30 @@ def generate_html_report(issues, url, output_dir):
             text-align: left;
             font-weight: 600;
             white-space: nowrap;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+        }}
+        th:hover {{
+            background: #003d88;
+        }}
+        th .sort-arrow {{
+            display: inline-block;
+            margin-left: 0.5rem;
+            opacity: 0.5;
+            font-size: 0.7rem;
+        }}
+        th.sort-asc .sort-arrow::after {{
+            content: '▲';
+            opacity: 1;
+        }}
+        th.sort-desc .sort-arrow::after {{
+            content: '▼';
+            opacity: 1;
+        }}
+        th:not(.sort-asc):not(.sort-desc) .sort-arrow::after {{
+            content: '▲▼';
+            font-size: 0.6rem;
         }}
         td {{
             padding: 0.6rem 1rem;
@@ -690,16 +714,16 @@ def generate_html_report(issues, url, output_dir):
             <table id="resultsTable">
                 <thead>
                     <tr>
-                        <th>URL</th>
-                        <th>Type</th>
-                        <th>Full Selector</th>
-                        <th>Parent Context</th>
-                        <th>Property</th>
-                        <th>Expected</th>
-                        <th>Found</th>
-                        <th>Status</th>
-                        <th>Source</th>
-                        <th>Text Snippet</th>
+                        <th onclick="sortTable(0)">URL<span class="sort-arrow"></span></th>
+                        <th onclick="sortTable(1)">Type<span class="sort-arrow"></span></th>
+                        <th onclick="sortTable(2)">Full Selector<span class="sort-arrow"></span></th>
+                        <th onclick="sortTable(3)">Parent Context<span class="sort-arrow"></span></th>
+                        <th onclick="sortTable(4)">Property<span class="sort-arrow"></span></th>
+                        <th onclick="sortTable(5)">Expected<span class="sort-arrow"></span></th>
+                        <th onclick="sortTable(6)">Found<span class="sort-arrow"></span></th>
+                        <th onclick="sortTable(7)">Status<span class="sort-arrow"></span></th>
+                        <th onclick="sortTable(8)">Source<span class="sort-arrow"></span></th>
+                        <th onclick="sortTable(9)">Text Snippet<span class="sort-arrow"></span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -710,6 +734,9 @@ def generate_html_report(issues, url, output_dir):
     </div>
 
     <script>
+        let currentSortCol = -1;
+        let sortAsc = true;
+
         function filterTable() {{
             const typeFilter = document.getElementById('typeFilter').value.toLowerCase();
             const statusFilter = document.getElementById('statusFilter').value;
@@ -730,6 +757,50 @@ def generate_html_report(issues, url, output_dir):
 
                 row.style.display = typeMatch && statusMatch && sourceMatch && searchMatch ? '' : 'none';
             }});
+        }}
+
+        function sortTable(colIndex) {{
+            const table = document.getElementById('resultsTable');
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const headers = table.querySelectorAll('th');
+
+            // Toggle sort direction if clicking the same column
+            if (currentSortCol === colIndex) {{
+                sortAsc = !sortAsc;
+            }} else {{
+                sortAsc = true;
+                currentSortCol = colIndex;
+            }}
+
+            // Update header classes for visual feedback
+            headers.forEach((th, i) => {{
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (i === colIndex) {{
+                    th.classList.add(sortAsc ? 'sort-asc' : 'sort-desc');
+                }}
+            }});
+
+            // Sort rows
+            rows.sort((a, b) => {{
+                const aText = a.cells[colIndex].textContent.trim().toLowerCase();
+                const bText = b.cells[colIndex].textContent.trim().toLowerCase();
+
+                // Try numeric comparison first
+                const aNum = parseFloat(aText);
+                const bNum = parseFloat(bText);
+                if (!isNaN(aNum) && !isNaN(bNum)) {{
+                    return sortAsc ? aNum - bNum : bNum - aNum;
+                }}
+
+                // Fall back to string comparison
+                if (aText < bText) return sortAsc ? -1 : 1;
+                if (aText > bText) return sortAsc ? 1 : -1;
+                return 0;
+            }});
+
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
         }}
     </script>
 </body>
